@@ -1,0 +1,103 @@
+services:
+
+  otel-collector:
+    image: otel/opentelemetry-collector:0.77.0
+    container_name: otel-collector
+    volumes:
+      - ./config/config-otel-collector.yaml:/etc/config.yaml
+    command: [ --config=/etc/config.yaml ]
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 128M
+        reservations:
+          cpus: "0.20"
+          memory: 20M
+    ports:
+      # - 1888:1888 # pprof extension
+      # - 8888:8888 # Prometheus metrics exposed by the collector
+      - 8889:8889 # Prometheus exporter metrics
+      # - 13133:13133 # health_check extension
+      - 4317:4317 # OTLP gRPC receiver
+      - 4318:4318 # OTLP http receiver
+      # - 55679:55679 # zpages extension
+    networks:
+      - karcis-com
+    restart: on-failure
+
+
+  jaeger-aio:
+    container_name: jaeger-aio
+    image: jaegertracing/all-in-one:1.45
+    ports:
+      # - 14250:14250 # HTTP, colecctor accept model.proto
+      - 16686:16686 # dashboard jaeger
+    networks:
+      - karcis-com
+    restart: on-failure
+
+
+  order-app:
+    build: ./order-svc
+    container_name: order-svc
+    environment:
+      - DB_HOST=postgres-karcis
+      - OTEL_HOST=otel-collector:4317
+      - OTEL_SAMPLER_RATIO=1
+    ports:
+      - 8080:8080
+    networks:
+      - karcis-com
+    depends_on:
+      - postgres
+      - jaeger-aio
+      - otel-collector
+    restart: on-failure
+
+
+  postgres:
+    container_name: postgres-karcis
+    image: postgres:12-alpine
+    ports:
+      - 5432:5432
+    environment:
+      - POSTGRES_PASSWORD=karcisDotCom
+      - POSTGRES_DB=karcis_com
+    networks:
+      - karcis-com
+    restart: on-failure
+
+## Tambahan untuk mendemokan metrics di promethues & grafana
+
+  prometheus:
+    container_name: prometheus
+    image: prom/prometheus:v2.44.0
+    ports:
+      - 9090:9090
+    networks:
+      - karcis-com
+    volumes:
+      - ./config/prometheus.yaml:/etc/prometheus/prometheus.yml
+    depends_on:
+      - otel-collector
+    restart: on-failure
+
+  grafana:
+    container_name: grafana
+    image: grafana/grafana-oss:9.5.2
+    ports:
+      - 3333:3000
+    networks:
+      - karcis-com
+    depends_on:
+      - prometheus
+    volumes:
+      # - ./config/grafana/grafana.ini:/etc/grafana/grafana.ini
+      - ./config/grafana/prometheus-datasource.yaml:/etc/grafana/provisioning/datasources/prometheus.yaml
+      - ./config/grafana/dashboard.json:/var/lib/grafana/dashboards/dashboard.json
+      - ./config/grafana/dashboard.yaml:/etc/grafana/provisioning/dashboards/dashboard.yaml
+    restart: on-failure
+
+networks:
+  karcis-com:
