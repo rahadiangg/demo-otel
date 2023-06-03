@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"log"
 	"net/http"
 	"os"
@@ -21,10 +23,11 @@ import (
 const name = "order-svc"
 
 var port = "8080"
-var db_host = "127.0.0.1"
+var db_host = "127.0.0.1:4317"
 var otel_host = "127.0.0.1"
 var db_max_conn = "80"
 var sampler = float64(1)
+var payment_host = "127.0.0.1"
 
 func init() {
 	e_db_host, exist := os.LookupEnv("DB_HOST")
@@ -45,6 +48,11 @@ func init() {
 	e_db_max_conn, exist := os.LookupEnv("DB_MAX_CONN")
 	if exist {
 		db_max_conn = e_db_max_conn
+	}
+
+	e_payment_host, exist := os.LookupEnv("PAYMENT_HOST")
+	if exist {
+		payment_host = e_payment_host
 	}
 
 	e_sampler, exist := os.LookupEnv("OTEL_SAMPLER_RATIO")
@@ -182,6 +190,68 @@ func main() {
 			attribute.String("status", "success"),
 		)) // increase meter
 		c.JSON(http.StatusOK, "ok tiket berhasil dibeli")
+	})
+
+	v2 := r.Group("/v2")
+	eventV2 := v2.Group("/event")
+
+	eventV2.POST("/:id/buy", func(c *gin.Context) {
+		id := c.Param("id")
+
+		ctx, span := tp.Tracer(name).Start(c.Request.Context(), "Convert string to int for ID")
+		defer span.End()
+
+		userID, err := strconv.Atoi(id)
+		if err != nil {
+			span.SetStatus(codes.Error, "error ehen convert strin to int ID user")
+			span.RecordError(err)
+			c.JSON(http.StatusInternalServerError, err.Error())
+			return
+		}
+
+		// check balance
+		ctx, span = tp.Tracer(name).Start(ctx, "check balance")
+		defer span.End()
+
+		var payload = PayloadRequestBalance{
+			UserId: userID,
+		}
+
+		res, err := httpRequest(ctx, "POST", payment_host+"/balance-check", payload)
+
+		if err != nil {
+			span.SetStatus(codes.Error, "error request balance check")
+			span.RecordError(err)
+			c.JSON(http.StatusInternalServerError, err.Error())
+			return
+		}
+
+		// parse data
+		ctx, span = tp.Tracer(name).Start(ctx, "parse response data")
+		defer span.End()
+
+		var dataParsed PayloadResponseBalance
+		if err := json.Unmarshal(res.Body, &dataParsed); err != nil {
+			span.SetStatus(codes.Error, "error when paese response data")
+			span.RecordError(err)
+			c.JSON(http.StatusInternalServerError, err.Error())
+			return
+		}
+
+		// check
+		_, span = tp.Tracer(name).Start(ctx, "balance reduction")
+		defer span.End()
+
+		if dataParsed.Balance < 100000 {
+			msg := "balance is not enough"
+			span.SetStatus(codes.Error, msg)
+			span.RecordError(errors.New(msg))
+			span.SetAttributes(attribute.Int64("balance", dataParsed.Balance))
+			c.JSON(http.StatusInternalServerError, msg)
+			return
+		}
+
+		c.JSON(http.StatusOK, "OK")
 	})
 
 	r.GET("/", func(ctx *gin.Context) {

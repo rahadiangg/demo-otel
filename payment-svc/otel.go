@@ -4,13 +4,10 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"time"
 
 	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
 	"go.opentelemetry.io/otel/propagation"
-	"go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/resource"
 	"go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
@@ -83,37 +80,4 @@ func initTraceProvider() (*trace.TracerProvider, error) {
 
 	// Shutdown will flush any remaining spans and shut down the exporter.
 	return tracerProvider, nil
-}
-
-func initMeterProvider(ctx context.Context) (*metric.MeterProvider, error) {
-
-	grpcConn, err := createGrpcConn()
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	exp, err := otlpmetricgrpc.New(
-		ctx,
-		otlpmetricgrpc.WithGRPCConn(grpcConn),
-	)
-
-	if err != nil {
-		return nil, fmt.Errorf("can't init exporter: %v", err)
-	}
-
-	// create resource
-	res, err := createResource(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	mp := metric.NewMeterProvider(
-		metric.WithReader(
-			metric.NewPeriodicReader(exp, metric.WithInterval(3*time.Second)),
-		),
-		metric.WithResource(res),
-	)
-
-	otel.SetMeterProvider(mp)
-	return mp, nil
 }
