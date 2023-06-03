@@ -44,7 +44,7 @@ services:
     environment:
       - DB_HOST=postgres-karcis
       - OTEL_HOST=otel-collector:4317
-      - PAYMENT_HOST=http://host.docker.internal:8181
+      - PAYMENT_HOST=http://payment-svc:8181
       - OTEL_SAMPLER_RATIO=1
     ports:
       - 8080:8080
