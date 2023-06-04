@@ -14,18 +14,19 @@ processors:
 
   # Detail dari tail sampling dapat cek disini
   # https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/processor/tailsamplingprocessor/README.md
-  # tail_sampling: 
-  #   decision_wait: 10s
-  #   num_traces: 100
-  #   expected_new_traces_per_sec: 10
-  #   policies:
-  #     [
-  #         {
-  #           name: test-policy-error-only,
-  #           type: status_code,
-  #           status_code: {status_codes: [ERROR]}
-  #         },
-  #     ]
+  tail_sampling:
+    decision_wait: 5s
+    num_traces: 100
+    expected_new_traces_per_sec: 10
+    policies:
+      [
+        {
+          name: policy-error-only,
+          type: status_code,
+          status_code: {status_codes: [ERROR]}
+        },
+      ]
+
 
 
 exporters:
@@ -51,6 +52,7 @@ service:
     traces:
       receivers: [otlp]
       processors: [batch, memory_limiter]
+      # processors: [batch, memory_limiter, tail_sampling] # use this if want use tail_sampling
       exporters: [jaeger]
     metrics:
       receivers: [otlp]

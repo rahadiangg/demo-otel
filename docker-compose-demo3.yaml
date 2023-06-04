@@ -1,7 +1,7 @@
 services:
 
   otel-collector:
-    image: otel/opentelemetry-collector:0.77.0
+    image: otel/opentelemetry-collector-contrib:0.77.0
     container_name: otel-collector
     volumes:
       - ./config/config-otel-collector.yaml:/etc/config.yaml
