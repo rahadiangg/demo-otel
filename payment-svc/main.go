@@ -13,6 +13,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/baggage"
 	"go.opentelemetry.io/otel/codes"
 )
 
@@ -70,6 +71,11 @@ func main() {
 
 	r.POST("/balance-check", func(c *gin.Context) {
 
+		// parse baggage
+		reqBaggage := baggage.FromContext(c.Request.Context())
+		log.Printf("user ID \t\t: %s\n", reqBaggage.Member("user_id").Value())
+		log.Printf("mock baggages \t: %s\n", reqBaggage.Member("test_baggages").Value())
+
 		ctx, span := tp.Tracer(name).Start(c.Request.Context(), "parse body to json")
 		defer span.End()
 
@@ -111,9 +117,7 @@ func main() {
 		}
 		span.SetAttributes(attribute.Int64("balance", balance))
 
-		c.JSON(http.StatusOK, gin.H{
-			"data": jsonResponse,
-		})
+		c.JSON(http.StatusOK, jsonResponse)
 
 	})
 

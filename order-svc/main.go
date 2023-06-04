@@ -15,6 +15,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/baggage"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/metric"
 	"gorm.io/gorm/clause"
@@ -217,6 +218,13 @@ func main() {
 			UserId: userID,
 		}
 
+		// setup Baggages
+		baggageUserId, _ := baggage.NewMember("user_id", id)
+		baggageMock, _ := baggage.NewMember("test_baggages", "test-value-baggae") // the value can't have space
+		b, _ := baggage.New(baggageUserId, baggageMock)
+		ctx = baggage.ContextWithBaggage(ctx, b)
+
+		// request to payment service
 		res, err := httpRequest(ctx, "POST", payment_host+"/balance-check", payload)
 
 		if err != nil {
