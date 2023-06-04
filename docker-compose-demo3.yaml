@@ -100,8 +100,23 @@ services:
       - ./config/grafana/dashboard.yaml:/etc/grafana/provisioning/dashboards/dashboard.yaml
     restart: on-failure
 
-## Tambahan aplikasi nodeJS untuk simulasi baggages
+## Tambahan payment-svc untuk simulasi baggages
 
+  payment-svc:
+    container_name: payment-svc
+    build: ./payment-svc
+    ports:
+      - 8181:8181
+    environment:
+      - PORT=8181
+      - OTEL_HOST=otel-collector:4317
+      - OTEL_SAMPLER_RATIO=1
+    depends_on:
+      - order-app
+    networks:
+      - karcis-com
+    restart: on-failure
+    
 
 
 networks:
